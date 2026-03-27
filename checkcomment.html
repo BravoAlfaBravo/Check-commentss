@@ -7,9 +7,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#f1f5f9;font-family:'Inter',sans-serif;font-size:14px;color:#1e293b;background-image:url('bravo-bg.jpg');background-size:cover;background-position:center;background-attachment:fixed;background-repeat:no-repeat}
-body::before{content:'';position:fixed;inset:0;background:rgba(15,25,50,0.82);z-index:0;pointer-events:none}
-.hdr,.tabs,.stats,.filters,.tbl-wrap,.tab-pane,.ag-grid,.guide{position:relative;z-index:1}
+body{font-family:'Inter',sans-serif;font-size:14px;color:#1e293b;background-image:url('bravo-bg.jpg');background-size:cover;background-position:center;background-attachment:fixed;background-repeat:no-repeat;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:rgba(10,20,45,0.75);z-index:0;pointer-events:none}
+.hdr,.tabs,.stats,.filters,.tbl-wrap,.tab-pane,.ag-grid,.guide,.ov{position:relative;z-index:1}
+.tabs,.stats .stat,.filters,.tbl-wrap{background:rgba(255,255,255,0.92)!important}
+.hdr{background:rgba(15,23,42,0.97)!important}
 /* HEADER */
 .hdr{background:#1e293b;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap}
 .hdr-title h1{font-size:16px;font-weight:600;letter-spacing:-.2px}
