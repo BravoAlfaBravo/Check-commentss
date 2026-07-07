@@ -194,6 +194,10 @@ tr:last-child td{border-bottom:none}
 
 .b-probleme{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
 
+.b-audit-critique{background:#450a0a;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.b-audit-eleve{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.b-audit-verifier{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:3px}
+tr.audit-critique td{background:#fef2f2!important;border-left:3px solid #991b1b}
 tr.nouveau-mal-traite td{background:#fff5f5!important;border-left:3px solid #ef4444}
 
 tr.has-probleme td{background:#fffbf0!important;border-left:3px solid #f97316}
@@ -415,6 +419,8 @@ tr.vente-conclue{opacity:0.45;font-style:italic}
   <div class="tab" onclick="switchTab('remontes',this)">Remontés/Temporisés <span class="tb" id="tb-rem">0</span></div>
 
   <div class="tab" onclick="switchTab('erreurs',this)">Erreurs agents <span class="tb" id="tb-err">0</span></div>
+
+  <div class="tab" onclick="switchTab('audit',this)">🔎 À auditer <span class="tb" id="tb-audit">0</span></div>
 
   <div class="tab" onclick="switchTab('stats',this)">Stats par agent</div>
 
@@ -990,6 +996,32 @@ function isProbleme(c){
 
 }
 
+function auditCas(r){
+  const cmt = (r.commentaire||'').toLowerCase();
+  const j = (typeof r.jours==='number') ? r.jours : (daysBetween(r.date) ?? 0);
+  const ouvert = r.statut !== 'Résolu';
+  let score = 0;
+  const raisons = [];
+  const add = (pts, txt) => { score += pts; raisons.push(txt); };
+  const attente = /invit[ée].*patient|patienter|sera rappel|sera recontact|on va revenir vers|va (le )?rappeler|rappel (proposé|prévu|à faire)|en attente de|dans l['e] attente|reviendra vers|un(e)? (collègue|agent|technicien).*(va|passera)|le bo va|sera trait[ée]|prise en charge (à|a) (venir|suivre)|suivi (à|a) faire|à recontacter/i;
+  if(attente.test(cmt)) add(ouvert?3:1, "Promesse attente/rappel laissée au client");
+  if(ouvert && j>=7) add(3, "Ouvert depuis "+j+" jours (>=7)");
+  else if(ouvert && j>=3) add(1, "Ouvert depuis "+j+" jours (3-6)");
+  if(r.statut==='Résolu' && attente.test(cmt)) add(3, "Marqué Résolu mais promesse attente non close");
+  if(/pas (de )?suivi|aucun suivi|non trait|pas trait|non pris en charge|pas pris en charge|jamais rappel|pas rappel|pas de retour|aucun retour|toujours pas (résol|régl)|jamais (résol|régl)|non résol|sans solution|aucune solution|solution non/i.test(cmt))
+    add(3, "Indice de traitement incomplet / non résolu");
+  if(/2[eè]me appel|3[eè]me appel|deuxi[èe]me appel|troisi[èe]me appel|plusieurs appels|d[ée]j[àa] appel[ée]|rappel[ée] plusieurs|relance|superviseur|gestionnaire|escalad|plainte/i.test(cmt))
+    add(2, "Répétition / escalade détectée");
+  if(/insatisf|m[ée]content|en col[èe]re|frustr|pas content|veut annuler|menace|r[ée]silier|va partir|meilleure offre chez|fraude|litige/i.test(cmt))
+    add(2, "Mécontentement / risque de résiliation");
+  if((r.commentaire||'').trim().length < 25) add(1, "Commentaire très court (traçabilité faible)");
+  let niveau = 'ok';
+  if(score>=6) niveau='critique';
+  else if(score>=4) niveau='eleve';
+  else if(score>=2) niveau='verifier';
+  return { suspect: niveau!=='ok', niveau, score, raisons };
+}
+
 function detectRaison(colVal, cmt){
 
   const v=(colVal||'').trim().toLowerCase();
@@ -1155,6 +1187,7 @@ function updateStats(){
   $('tb-rem').textContent=rem;
 
   $('tb-err').textContent=DATA.filter(r=>r.erreur).length;
+  $('tb-audit').textContent=DATA.filter(r=>auditCas(r).suspect).length;
 
 }
 
@@ -1195,6 +1228,7 @@ function doFilter(){
   if(activeTab==='remontes') src=DATA.filter(r=>r.remonte);
 
   else if(activeTab==='erreurs') src=DATA.filter(r=>r.erreur);
+  else if(activeTab==='audit') src=DATA.filter(r=>auditCas(r).suspect);
 
 
 
@@ -1366,7 +1400,7 @@ function renderTable(){
 
       <td class="dt">${dateCreFmt}</td>
 
-      <td><span class="acc">${esc(r.acc)}</span>${nouveauMalBadge}${problemeBadge}</td>
+      <td><span class="acc">${esc(r.acc)}</span>${nouveauMalBadge}${problemeBadge}${(function(){var a=auditCas(r);return a.suspect?'<br><span class="b-audit-'+a.niveau+'" title="'+esc(a.raisons.join(" | "))+'">🔎 '+a.niveau.toUpperCase()+' ('+a.score+')</span>':'';})()}</td>
 
       <td><div class="cname">${esc(r.nom)} ${esc(r.prenom)}</div><div class="ctel">${esc(r.tel)}</div></td>
 
@@ -1958,13 +1992,13 @@ function doExportCSV(){
 
   if(!src.length){showToast('Aucune donnée à exporter',false);return;}
 
-  const hdrs=['Type compte','Date création','ACC','Nom','Prénom','Téléphone','Agent','Date','Nb jours','Alerte','Raison','Statut','État','Commentaire','Remonté/Temp','Erreur agent','Nouveau mal traité','Problème détecté'];
+  const hdrs=['Type compte','Date création','ACC','Nom','Prénom','Téléphone','Agent','Date','Nb jours','Alerte','Raison','Statut','État','Commentaire','Remonté/Temp','Erreur agent','Nouveau mal traité','Problème détecté','Niveau audit','Motifs audit'];
 
   const rows=src.map(r=>[r.type||'Résidentiel',r.dateCreation||'',r.acc,r.nom,r.prenom,r.tel,r.agent,r.date,r.jours??'',
 
     r.alerte==='rouge'?'Rouge':r.alerte==='orange'?'Orange':'Verte',
 
-    r.raison,r.statut,r.etat,r.commentaire,r.remonte?'Oui':'Non',r.erreur?'Oui':'Non',isNouveauMalTraite(r.dateCreation,r.commentaire)?'Oui':'Non',isProbleme(r.commentaire)?'Oui':'Non']);
+    r.raison,r.statut,r.etat,r.commentaire,r.remonte?'Oui':'Non',r.erreur?'Oui':'Non',isNouveauMalTraite(r.dateCreation,r.commentaire)?'Oui':'Non',isProbleme(r.commentaire)?'Oui':'Non',auditCas(r).suspect?auditCas(r).niveau:'',auditCas(r).raisons.join(' | ')]);
 
   const csv=[hdrs,...rows].map(row=>row.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
 
